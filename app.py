@@ -6,8 +6,10 @@ from langchain.retrievers import MultiQueryRetriever
 from langchain_community.document_loaders import UnstructuredMarkdownLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
+from langchain.prompts import ChatPromptTemplate
+from langchain import hub
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-import openai
+from dotenv import load_dotenv
 
 
 # Load environment variables from .env file
