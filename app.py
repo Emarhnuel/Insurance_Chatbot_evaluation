@@ -9,74 +9,66 @@ from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 import openai
 
-from dotenv import load_dotenv
 
+# Load environment variables from .env file
 load_dotenv()
 
-# Set up Streamlit secrets to securely store the OpenAI API key
-os.environ['OPENAI_API_KEY'] = os.getenv("OPENAI_API_KEY")
-
-
-
+# Set up OpenAI API key
+os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
 
 # Define prompt for the LLM
-prompt = """
-You are a helpful and knowledgeable insurance chatbot. 
-You have access to a comprehensive insurance policy document. 
-Please answer the user's question based on the information provided in the document. 
-If the answer is not found in the document, please politely inform the user. 
-Here is the user's question: {question}
-Here are the relevant documents: {context}
+prompt_template = """Answer the question based only on the following context. If you cannot answer the question with the context, please respond with 'I don't know':
+Context: {context}
+Question: {question}
 """
 
-# Set the path to your Markdown file
-markdown_path = "Data/OUTPUT/policy-booklet-0923/policy-booklet-0923.md"
-
 # Load and process the Markdown file
+markdown_path = "Data/OUTPUT/policy-booklet-0923/policy-booklet-0923.md"
 loader = UnstructuredMarkdownLoader(markdown_path)
 documents = loader.load()
+
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
 documents = text_splitter.split_documents(documents)
-embeddings = OpenAIEmbeddings()
+
+# Create embeddings and vector store
+embeddings = OpenAIEmbeddings(model="text-embedding-ada-002")
 vector_store = FAISS.from_documents(documents, embeddings)
+
+# Create retriever and set up LLM
 retriever = vector_store.as_retriever()
+qa_llm = ChatOpenAI(model_name="gpt-4o", temperature=0)
+advanced_retriever = MultiQueryRetriever.from_llm(retriever=retriever, llm=qa_llm)
+retrieval_qa_prompt = hub.pull("langchain-ai/retrieval-qa-chat")
 
-# Set up LLM and Retriever
-primary_qa_llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
-advanced_retriever = MultiQueryRetriever.from_llm(retriever=retriever, llm=primary_qa_llm)
-document_chain = create_stuff_documents_chain(primary_qa_llm, prompt)
-retrieval_chain = create_retrieval_chain(advanced_retriever, document_chain)
+# Create the QA chain with the prompt template
+document_chain = create_stuff_documents_chain(qa_llm, retrieval_qa_prompt)
+retrieval_qa_prompt = ChatPromptTemplate.from_template(prompt_template)
+qa_chain = create_retrieval_chain(document_chain, retrieval_qa_prompt)
 
-# Title and description
+
+# Streamlit App
 st.title("Insurance Policy Chatbot")
 st.write("Your guide to understanding your insurance coverage.")
 
-# Chat history
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Display chat messages
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Get user input
 if prompt := st.chat_input("Ask me about your policy"):
-    # Append user message to chat history
     st.session_state.messages.append({"role": "user", "content": prompt})
-    # Display user message in chat message container
     with st.chat_message("user"):
         st.markdown(prompt)
 
     try:
-        # Get chatbot response
-        response = retrieval_chain.invoke({"input": prompt})
-        answer = response['answer']
+        response = qa_chain({"query": prompt})
+        answer = response['result']
 
-        # Append chatbot response to chat history
         st.session_state.messages.append({"role": "assistant", "content": answer})
-        # Display chatbot response in chat message container
         with st.chat_message("assistant"):
             st.markdown(answer)
+
     except Exception as e:
         st.error(f"An error occurred: {e}")
