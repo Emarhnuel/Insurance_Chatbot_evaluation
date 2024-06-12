@@ -9,9 +9,12 @@ from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 import openai
 
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Set up Streamlit secrets to securely store the OpenAI API key
-st.secrets["OpenAI_key"] == "OPENAI_API_KEY"
+os.environ['OPENAI_API_KEY'] = os.getenv("OPENAI_API_KEY")
 
 
 
