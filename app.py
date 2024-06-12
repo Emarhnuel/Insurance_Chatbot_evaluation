@@ -11,8 +11,7 @@ import openai
 
 
 # Set up Streamlit secrets to securely store the OpenAI API key
-openai.api_key = st.secrets["API"]["OPENAI_API_KEY"]
-#os.environ["OPENAI_API_KEY"] = openai.api_key
+st.secrets["OpenAI_key"] == "OPENAI_API_KEY"
 
 
 
