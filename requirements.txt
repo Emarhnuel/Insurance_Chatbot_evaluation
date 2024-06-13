@@ -6,9 +6,10 @@ faiss-cpu
 openai
 tiktoken
 pypdf2
+python-dotenv
+markdown
 unstructured
 pandas
 sentence-transformers
 langchain-core
 langchainhub
-
