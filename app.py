@@ -10,7 +10,6 @@ from langchain.prompts.chat import (ChatPromptTemplate,
                                     SystemMessagePromptTemplate)
 from langchain.retrievers import MultiQueryRetriever
 from langchain.chains import RetrievalQA
-from langchain.chains.combine_documents import create_stuff_documents_chain
 
 # Load environment variables
 load_dotenv()
@@ -20,7 +19,7 @@ os.environ["OPENAI_API_KEY"] = openai_api_key
 # Define the chatbot function
 def main():
     # Streamlit app setup
-    st.title("LangChain Chatbot for Insurance Policy")
+    st.title("Churchill Insurance Chatbot")
     st.write("Ask questions about your insurance policy!")
 
     # Load and process the document
@@ -35,13 +34,12 @@ def main():
     retriever = vector_store.as_retriever()
 
     # Define the prompt template
-    system_template = """
-    Answer the question based only on the following context.
-    If you cannot answer the question with the context, please respond with 'I don't know'
-    """
     messages = [
-        SystemMessagePromptTemplate.from_template(system_template),
-        HumanMessagePromptTemplate.from_template("{question}"),
+        SystemMessagePromptTemplate(
+            content="You are a helpful and informative chatbot about Churchill Insurance policies. "
+                    "Use your knowledge to answer the user's questions based on the provided context."
+        ),
+        HumanMessagePromptTemplate(content="{question}"),
     ]
 
     # Create the prompt
@@ -56,7 +54,7 @@ def main():
     # Streamlit input and interaction
     user_input = st.text_input("Enter your question here:")
     if user_input:
-        response = qa_chain(prompt=user_input)
+        response = qa_chain(user_input)
         st.write(response)
 
 
