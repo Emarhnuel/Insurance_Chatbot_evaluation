@@ -14,3 +14,17 @@ The project includes an evaluation notebook (Ipynb file) that uses the Ragas lib
 * Context Precision
 * Context Recall
 * Answer Correctness
+
+## Usage
+* Use the Chatbot: [insurancechatbot1.streamlit.app](https://insurancechatbot1.streamlit.app/)
+* Enter Questions: Type your insurance policy questions in the Streamlit interface.
+* Get Answers: The chatbot will respond with answers based on the policy document.
+
+## Evaluation
+* Open the Notebook: Open the Ipynb file in a Jupyter Notebook environment.
+* Run the Cells: Execute the cells in the notebook to generate a test dataset, run the chatbot, and evaluate its performance using Ragas.
+
+## Customization
+* Modify the markdown_path in app.py to use your document.
+* Adjust parameters in the RecursiveCharacterTextSplitter to control how the document is split.
+* Explore different OpenAI language models by changing the model_name in ChatOpenAI.
