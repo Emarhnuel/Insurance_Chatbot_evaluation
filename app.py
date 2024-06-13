@@ -55,9 +55,6 @@ def main():
         response = qa_chain(prompt=user_input)
         st.write(response)
 
-        # # Run the prompt and return the response
-        # response = qa(prompt)
-        # st.write(response)
 
 if __name__ == "__main__":
     main()
