@@ -1,89 +1,96 @@
-import os
 import streamlit as st
-from dotenv import load_dotenv
-from langchain.document_loaders import UnstructuredMarkdownLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores import FAISS
-from langchain.prompts import PromptTemplate
+import os
+from langchain.chains import create_retrieval_chain
+from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.retrievers import MultiQueryRetriever
-from langchain_core.documents import Document
-from langchain.chains import RetrievalQA,  ConversationalRetrievalChain
-from langchain.memory import ConversationBufferMemory
-from langchain.chat_models import ChatOpenAI
+from langchain_community.document_loaders import UnstructuredMarkdownLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.vectorstores import FAISS
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+import openai
 
-# Load environment variables
-load_dotenv()
-os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
 
-# Define the chatbot function
+
+# Function to initialize or get API key from session state
+def get_openai_api_key():
+    api_key = st.sidebar.text_input("Enter your OpenAI API Key:", type="password")
+    if api_key:
+        return api_key
+    else:
+        return None
+
+
+
+
+# Define prompt for the LLM
+prompt = """
+You are a helpful and knowledgeable insurance chatbot. 
+You have access to a comprehensive insurance policy document. 
+Please answer the user's question based on the information provided in the document. 
+If the answer is not found in the document, please politely inform the user. 
+Here is the user's question: {question}
+Here are the relevant documents: {context}
+"""
+
+# Set the path to your Markdown file
+markdown_path = "Data/OUTPUT/policy-booklet-0923/policy-booklet-0923.md"
+
+
 def main():
-    # Streamlit app setup
-    st.title("Churchill Insurance Chatbot")
-    st.write("Ask questions about your insurance policy!")
+    # Title and description
+    st.title("Insurance Policy Chatbot")
+    st.write("Your guide to understanding your insurance coverage.")
 
-    # Load and process the document
-    markdown_path = "Data/OUTPUT/policy-booklet-0923/policy-booklet-0923.md"
-    loader = UnstructuredMarkdownLoader(markdown_path)
-    documents = loader.load()
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-    documents = text_splitter.split_documents(documents)
+    # Get API key from sidebar
+    openai_api_key = get_openai_api_key()
 
-    # Embed and store the document chunks
-    embeddings = OpenAIEmbeddings(model="text-embedding-ada-002")
-    vector_store = FAISS.from_documents(documents, embeddings)
-    retriever = vector_store.as_retriever(search_type="similarity", search_kwargs={"k": 4})
-
-    # Define the prompt template
-    prompt_template = """
-    <|im_start|>system
-    You are a helpful assistant.
-    You are given relevant documents for context and a question. Provide a conversational answer.
-    If you don't know the answer, just say "I do not know." Don't make up an answer.
-    <|im_end|>
-    <|im_start|>user
-    {question}
-    <|im_end|>
-    <|im_start|>assistant
-    {context} 
-    <|im_end|>
-    """
-    PROMPT = PromptTemplate(
-        template=prompt_template, input_variables=["context", "question"]
-    )
-
-    # Set up the LLM
-    llm = ChatOpenAI(model_name="gpt-3.5-turbo", temperature=0)
-
-    #Conversational Memory
-    memory = ConversationBufferMemory(memory_key="chat_history")
-
-    retriever_from_llm = MultiQueryRetriever.from_llm(retriever, llm=llm)
-
-    # Create the chain
-    qa_chain = ConversationalRetrievalChain.from_llm(llm=llm,
-                                                     chain_type="stuff",
-                                                     retriever=retriever_from_llm,
-                                                     memory=memory,
-                                                     combine_docs_chain_kwargs={"prompt": PROMPT})
-
-    # Streamlit input and interaction
+    # Chat history
     if "messages" not in st.session_state:
-        st.session_state["messages"] = [{"role": "assistant", "content": "How can I help you?"}]
+        st.session_state.messages = []
 
+    # Display chat messages
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
-            st.write(message["content"])
+            st.markdown(message["content"])
 
-    if prompt := st.chat_input():
+    # Get user input
+    if prompt := st.chat_input("Ask me about your policy"):
+        # Append user message to chat history
         st.session_state.messages.append({"role": "user", "content": prompt})
+        # Display user message in chat message container
         with st.chat_message("user"):
-            st.write(prompt)
+            st.markdown(prompt)
+        # Check for valid API key before proceeding
+        if openai_api_key is None:
+            st.error("Please enter your OpenAI API key in the sidebar.")
+            return
+        try:
+            # Embed and store the document chunks using user provided key
+            loader = UnstructuredMarkdownLoader(markdown_path)
+            documents = loader.load()
+            text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+            documents = text_splitter.split_documents(documents)
+            embeddings = OpenAIEmbeddings()
+            vector_store = FAISS.from_documents(documents, embeddings)
+            retriever = vector_store.as_retriever()
+            # Set up LLM and Retriever
+            primary_qa_llm = ChatOpenAI(openai_api_key=openai_api_key, model_name="gpt-3.5-turbo", temperature=0)
+            advanced_retriever = MultiQueryRetriever.from_llm(retriever=retriever, llm=primary_qa_llm)
+            document_chain = create_stuff_documents_chain(primary_qa_llm, prompt)
+            retrieval_chain = create_retrieval_chain(advanced_retriever, document_chain)
 
-        with st.chat_message("assistant"):
-            response = qa_chain({"question": prompt})
-            st.write(response["answer"])
-            st.session_state.messages.append({"role": "assistant", "content": response['answer']})
+            # Get chatbot response
+            response = retrieval_chain.invoke({"input": prompt})
+            answer = response['answer']
+
+            # Append chatbot response to chat history
+            st.session_state.messages.append({"role": "assistant", "content": answer})
+            # Display chatbot response in chat message container
+            with st.chat_message("assistant"):
+                st.markdown(answer)
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
+
 
 if __name__ == "__main__":
     main()
