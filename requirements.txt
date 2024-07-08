@@ -8,6 +8,7 @@ tiktoken
 pypdf2
 python-dotenv
 markdown
+psutil
 unstructured
 pandas
 sentence-transformers
