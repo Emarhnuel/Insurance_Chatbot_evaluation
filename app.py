@@ -7,6 +7,7 @@ from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import FAISS
 from langchain.prompts import PromptTemplate
 from langchain.retrievers import MultiQueryRetriever
+from langchain_core.documents import Document
 from langchain.chains import RetrievalQA,  ConversationalRetrievalChain
 from langchain.memory import ConversationBufferMemory
 from langchain.chat_models import ChatOpenAI
